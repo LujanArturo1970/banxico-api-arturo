@@ -1,1 +1,634 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Tablero Tipo de Cambio · Banxico</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+    :root {
+      --bg: #0d0f14;
+      --surface: #13161d;
+      --surface2: #1a1e28;
+      --border: #232733;
+      --text: #e8eaf0;
+      --muted: #6b7280;
+      --accent-usd: #f0b429;
+      --accent-eur: #60a5fa;
+      --accent-udi: #34d399;
+      --accent-usd-dim: rgba(240,180,41,0.12);
+      --accent-eur-dim: rgba(96,165,250,0.12);
+      --accent-udi-dim: rgba(52,211,153,0.12);
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      min-height: 100vh;
+      padding: 2rem 1.5rem 4rem;
+    }
+
+    /* ── ENCABEZADO ── */
+    header {
+      max-width: 1100px;
+      margin: 0 auto 3rem;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 1.25rem;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .header-left h1 {
+      font-family: 'DM Serif Display', serif;
+      font-size: clamp(1.8rem, 4vw, 2.6rem);
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+      color: var(--text);
+    }
+
+    .header-left h1 span {
+      font-style: italic;
+      color: var(--accent-usd);
+    }
+
+    .header-left p {
+      font-size: 0.8rem;
+      color: var(--muted);
+      font-family: 'DM Mono', monospace;
+      margin-top: 0.35rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--accent-udi);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.8); }
+    }
+
+    .live-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.7rem;
+      color: var(--accent-udi);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    /* ── TARJETAS ACTUALES ── */
+    .cards-grid {
+      max-width: 1100px;
+      margin: 0 auto 3rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+    }
+
+    .card {
+      background: var(--surface);
+      padding: 2rem 1.75rem;
+      position: relative;
+      overflow: hidden;
+      transition: background 0.2s;
+    }
+
+    .card:hover { background: var(--surface2); }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+    }
+
+    .card.usd::before { background: var(--accent-usd); }
+    .card.eur::before { background: var(--accent-eur); }
+    .card.udi::before { background: var(--accent-udi); }
+
+    .card-symbol {
+      font-family: 'DM Serif Display', serif;
+      font-size: 0.85rem;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 0.5rem;
+    }
+
+    .card.usd .card-symbol { color: var(--accent-usd); }
+    .card.eur .card-symbol { color: var(--accent-eur); }
+    .card.udi .card-symbol { color: var(--accent-udi); }
+
+    .card-value {
+      font-family: 'DM Mono', monospace;
+      font-size: clamp(2.2rem, 5vw, 3rem);
+      font-weight: 500;
+      letter-spacing: -0.03em;
+      line-height: 1;
+      margin-bottom: 0.75rem;
+    }
+
+    .card.usd .card-value { color: var(--accent-usd); }
+    .card.eur .card-value { color: var(--accent-eur); }
+    .card.udi .card-value { color: var(--accent-udi); }
+
+    .card-title {
+      font-size: 0.78rem;
+      color: var(--muted);
+      font-weight: 400;
+      margin-bottom: 0.2rem;
+    }
+
+    .card-date {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.7rem;
+      color: var(--muted);
+      opacity: 0.6;
+    }
+
+    .card-bg-num {
+      position: absolute;
+      bottom: -1rem;
+      right: 1rem;
+      font-family: 'DM Serif Display', serif;
+      font-size: 7rem;
+      opacity: 0.04;
+      line-height: 1;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    /* ── SECCIÓN CONSULTA ── */
+    .query-section {
+      max-width: 1100px;
+      margin: 0 auto 2rem;
+    }
+
+    .section-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.7rem;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 1rem;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 0;
+      border: 1px solid var(--border);
+      width: fit-content;
+      margin-bottom: 1.5rem;
+      overflow: hidden;
+    }
+
+    .tab {
+      padding: 0.6rem 1.4rem;
+      font-size: 0.78rem;
+      font-family: 'DM Mono', monospace;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      background: var(--surface);
+      color: var(--muted);
+      border: none;
+      cursor: pointer;
+      transition: all 0.15s;
+      border-right: 1px solid var(--border);
+    }
+
+    .tab:last-child { border-right: none; }
+    .tab:hover { background: var(--surface2); color: var(--text); }
+
+    .tab.active {
+      background: var(--accent-usd);
+      color: #000;
+      font-weight: 500;
+    }
+
+    .form-row {
+      display: flex;
+      gap: 0.75rem;
+      align-items: flex-end;
+      flex-wrap: wrap;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .form-group label {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.65rem;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .form-group input[type="date"] {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.6rem 0.85rem;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.85rem;
+      outline: none;
+      transition: border-color 0.15s;
+      color-scheme: dark;
+    }
+
+    .form-group input[type="date"]:focus {
+      border-color: var(--accent-usd);
+    }
+
+    .btn {
+      padding: 0.65rem 1.5rem;
+      background: var(--accent-usd);
+      color: #000;
+      border: none;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.78rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      cursor: pointer;
+      font-weight: 500;
+      transition: opacity 0.15s;
+    }
+
+    .btn:hover { opacity: 0.85; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── RESULTADOS DE CONSULTA ── */
+    .results-table-wrap {
+      max-width: 1100px;
+      margin: 0 auto;
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.82rem;
+    }
+
+    thead tr {
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      text-align: left;
+      padding: 0.75rem 1rem;
+      color: var(--muted);
+      font-size: 0.65rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      font-weight: 400;
+    }
+
+    tbody tr {
+      border-bottom: 1px solid rgba(35,39,51,0.6);
+      transition: background 0.1s;
+    }
+
+    tbody tr:hover { background: var(--surface); }
+
+    td {
+      padding: 0.7rem 1rem;
+      color: var(--text);
+    }
+
+    td.val-usd { color: var(--accent-usd); }
+    td.val-eur { color: var(--accent-eur); }
+    td.val-udi { color: var(--accent-udi); }
+    td.val-null { color: var(--muted); font-style: italic; }
+
+    .badge {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      font-size: 0.65rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      border-radius: 2px;
+    }
+
+    .badge-usd { background: var(--accent-usd-dim); color: var(--accent-usd); }
+    .badge-eur { background: var(--accent-eur-dim); color: var(--accent-eur); }
+    .badge-udi { background: var(--accent-udi-dim); color: var(--accent-udi); }
+
+    /* ── ESTADO ── */
+    .status-bar {
+      max-width: 1100px;
+      margin: 1.5rem auto 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    #status-msg {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.72rem;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+    }
+
+    #status-msg.error { color: #f87171; }
+    #status-msg.ok { color: var(--accent-udi); }
+
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent-usd);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── ANIMACIÓN ENTRADA ── */
+    .fade-in {
+      animation: fadeIn 0.4s ease both;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .divider {
+      max-width: 1100px;
+      margin: 2.5rem auto;
+      border: none;
+      border-top: 1px solid var(--border);
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <h1>Tipo de <span>Cambio</span></h1>
+    <p>Fuente: Banco de México · SIE API</p>
+  </div>
+  <div class="header-right">
+    <div class="dot"></div>
+    <span class="live-label">En vivo</span>
+  </div>
+</header>
+
+<!-- TARJETAS ACTUALES -->
+<div class="cards-grid" id="cards-actual">
+  <div class="card usd"><div class="card-symbol">USD</div><div class="card-value">—</div><div class="card-title">Cargando...</div><div class="card-date">—</div><div class="card-bg-num">$</div></div>
+  <div class="card eur"><div class="card-symbol">EUR</div><div class="card-value">—</div><div class="card-title">Cargando...</div><div class="card-date">—</div><div class="card-bg-num">€</div></div>
+  <div class="card udi"><div class="card-symbol">UDI</div><div class="card-value">—</div><div class="card-title">Cargando...</div><div class="card-date">—</div><div class="card-bg-num">U</div></div>
+</div>
+
+<hr class="divider">
+
+<!-- CONSULTA POR FECHA -->
+<div class="query-section">
+  <p class="section-label">Consulta histórica</p>
+
+  <div class="tabs">
+    <button class="tab active" onclick="setTab('fecha', this)">Fecha exacta</button>
+    <button class="tab" onclick="setTab('rango', this)">Rango</button>
+  </div>
+
+  <!-- Formulario fecha exacta -->
+  <div id="form-fecha" class="form-row">
+    <div class="form-group">
+      <label>Fecha</label>
+      <input type="date" id="input-fecha" />
+    </div>
+    <button class="btn" onclick="consultarFecha()">Consultar</button>
+  </div>
+
+  <!-- Formulario rango -->
+  <div id="form-rango" class="form-row" style="display:none">
+    <div class="form-group">
+      <label>Fecha inicio</label>
+      <input type="date" id="input-inicio" />
+    </div>
+    <div class="form-group">
+      <label>Fecha fin</label>
+      <input type="date" id="input-fin" />
+    </div>
+    <button class="btn" onclick="consultarRango()">Consultar</button>
+  </div>
+</div>
+
+<div class="status-bar">
+  <span id="status-msg">— Selecciona una fecha para consultar</span>
+  <div class="spinner" id="spinner"></div>
+</div>
+
+<div class="results-table-wrap" id="results-wrap" style="margin-top:1.5rem"></div>
+
+<script>
+  // Clases por serie ID
+  const SERIE_META = {
+    SF43718: { cls: 'usd', label: 'USD · Dólar', badge: 'badge-usd' },
+    SF46410: { cls: 'eur', label: 'EUR · Euro',   badge: 'badge-eur' },
+    SF60653: { cls: 'udi', label: 'UDI',           badge: 'badge-udi' },
+  };
+
+  // Poner fechas máx = hoy
+  const hoy = new Date().toISOString().split('T')[0];
+  ['input-fecha','input-inicio','input-fin'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.max = hoy; el.value = hoy; }
+  });
+
+  // ── Cargar datos actuales ──────────────────────────────────────────────────
+  async function cargarActual() {
+    try {
+      const res = await fetch('/api/tipo-cambio/actual');
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error);
+
+      const clases = ['usd', 'eur', 'udi'];
+      const cards = document.querySelectorAll('#cards-actual .card');
+
+      json.data.forEach((item, i) => {
+        const card = cards[i];
+        const meta = SERIE_META[item.id] || {};
+        card.querySelector('.card-symbol').textContent = meta.label?.split(' · ')[0] ?? item.id;
+        card.querySelector('.card-value').textContent = item.valor ? `$${item.valor.toFixed(4)}` : 'N/D';
+        card.querySelector('.card-title').textContent = item.titulo;
+        card.querySelector('.card-date').textContent = item.fecha;
+        card.classList.add('fade-in');
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  // ── Tabs ──────────────────────────────────────────────────────────────────
+  let tabActual = 'fecha';
+
+  function setTab(tab, btn) {
+    tabActual = tab;
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('form-fecha').style.display = tab === 'fecha' ? 'flex' : 'none';
+    document.getElementById('form-rango').style.display = tab === 'rango' ? 'flex' : 'none';
+    limpiarResultados();
+  }
+
+  // ── Helpers UI ────────────────────────────────────────────────────────────
+  function setStatus(msg, tipo = '') {
+    const el = document.getElementById('status-msg');
+    el.textContent = msg;
+    el.className = tipo;
+  }
+
+  function setLoading(on) {
+    document.getElementById('spinner').style.display = on ? 'block' : 'none';
+  }
+
+  function limpiarResultados() {
+    document.getElementById('results-wrap').innerHTML = '';
+    setStatus('— Selecciona una fecha para consultar');
+  }
+
+  // ── Renderizar tabla ──────────────────────────────────────────────────────
+  function renderTablaFecha(data) {
+    // data = [{id, titulo, fecha, valor}, ...]
+    const rows = data.map(item => {
+      const meta = SERIE_META[item.id] || {};
+      const valStr = item.valor != null ? `$${item.valor.toFixed(4)}` : 'N/E';
+      const valCls = item.valor != null ? `val-${meta.cls}` : 'val-null';
+      return `
+        <tr class="fade-in">
+          <td><span class="badge ${meta.badge}">${meta.cls?.toUpperCase()}</span></td>
+          <td>${item.titulo}</td>
+          <td>${item.fecha}</td>
+          <td class="${valCls}">${valStr}</td>
+        </tr>`;
+    }).join('');
+
+    document.getElementById('results-wrap').innerHTML = `
+      <table>
+        <thead><tr>
+          <th>Moneda</th><th>Serie</th><th>Fecha</th><th>Valor (MXN)</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  }
+
+  function renderTablaRango(data) {
+    // data = [{id, titulo, datos:[{fecha, valor}]}, ...]
+    // Unir todas las fechas únicas
+    const todasFechas = [...new Set(
+      data.flatMap(s => s.datos.map(d => d.fecha))
+    )].sort();
+
+    // Mapa: fecha -> {serieId: valor}
+    const mapa = {};
+    data.forEach(serie => {
+      serie.datos.forEach(d => {
+        if (!mapa[d.fecha]) mapa[d.fecha] = {};
+        mapa[d.fecha][serie.id] = d.valor;
+      });
+    });
+
+    const headers = data.map(s => {
+      const meta = SERIE_META[s.id] || {};
+      return `<th><span class="badge ${meta.badge}">${meta.cls?.toUpperCase()}</span></th>`;
+    }).join('');
+
+    const rows = todasFechas.map(fecha => {
+      const celdas = data.map(s => {
+        const meta = SERIE_META[s.id] || {};
+        const v = mapa[fecha]?.[s.id];
+        const valStr = v != null ? `$${v.toFixed(4)}` : '—';
+        const cls = v != null ? `val-${meta.cls}` : 'val-null';
+        return `<td class="${cls}">${valStr}</td>`;
+      }).join('');
+      return `<tr class="fade-in"><td>${fecha}</td>${celdas}</tr>`;
+    }).join('');
+
+    document.getElementById('results-wrap').innerHTML = `
+      <table>
+        <thead><tr><th>Fecha</th>${headers}</tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  }
+
+  // ── Consulta por fecha exacta ─────────────────────────────────────────────
+  async function consultarFecha() {
+    const fecha = document.getElementById('input-fecha').value;
+    if (!fecha) return setStatus('Selecciona una fecha', 'error');
+
+    setLoading(true);
+    setStatus(`Consultando ${fecha}…`);
+    document.getElementById('results-wrap').innerHTML = '';
+
+    try {
+      const res = await fetch(`/api/tipo-cambio/fecha?fecha=${fecha}`);
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error);
+
+      renderTablaFecha(json.data);
+      setStatus(`✓ Datos para ${fecha}`, 'ok');
+    } catch (e) {
+      setStatus(`Error: ${e.message}`, 'error');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // ── Consulta por rango ────────────────────────────────────────────────────
+  async function consultarRango() {
+    const inicio = document.getElementById('input-inicio').value;
+    const fin = document.getElementById('input-fin').value;
+    if (!inicio || !fin) return setStatus('Selecciona ambas fechas', 'error');
+    if (inicio > fin) return setStatus('La fecha inicio debe ser anterior al fin', 'error');
+
+    setLoading(true);
+    setStatus(`Consultando ${inicio} → ${fin}…`);
+    document.getElementById('results-wrap').innerHTML = '';
+
+    try {
+      const res = await fetch(`/api/tipo-cambio/rango?inicio=${inicio}&fin=${fin}`);
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error);
+
+      renderTablaRango(json.data);
+      const total = json.data[0]?.datos?.length ?? 0;
+      setStatus(`✓ ${total} registros del ${inicio} al ${fin}`, 'ok');
+    } catch (e) {
+      setStatus(`Error: ${e.message}`, 'error');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+  cargarActual();
+</script>
+</body>
+</html>
