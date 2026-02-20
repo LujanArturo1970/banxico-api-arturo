@@ -1,4 +1,4 @@
-// server.js - CÓDIGO MEJORADO CON CONSULTA POR FECHA
+// server.js - CÓDIGO COMPLETO CORREGIDO
 require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
@@ -14,46 +14,48 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('Public'));
 
-// SERIES: Dólar (SF43718), Euro (SF46410), UDI (SF60653)
-const SERIES_IDS = 'SF43718,SF46410,SF60653';
+const SERIES = ['SF43718', 'SF46410', 'SF60653'];
 
-// Helper para parsear y formatear la respuesta de Banxico
-function parsearSeries(series) {
-  return series.map(serie => {
-    const tieneDatos = serie.datos && serie.datos.length > 0;
-    return {
-      id: serie.idSerie,
-      titulo: serie.titulo,
-      datos: tieneDatos
-        ? serie.datos.map(d => ({
-            fecha: d.fecha,
-            valor: d.dato === 'N/E' ? null : parseFloat(d.dato)
-          }))
-        : []
-    };
-  });
+// Helper para parsear una serie individual
+function parsearSerie(serie) {
+  return {
+    id: serie.idSerie,
+    titulo: serie.titulo,
+    datos: serie.datos
+      ? serie.datos.map(d => ({
+          fecha: d.fecha,
+          valor: d.dato === 'N/E' ? null : parseFloat(d.dato)
+        }))
+      : []
+  };
 }
 
 // ─── RUTA 1: Valor más reciente (oportuno) ───────────────────────────────────
 app.get('/api/tipo-cambio/actual', async (req, res) => {
   try {
-    const url = `${BASE_URL}/${SERIES_IDS}/datos/oportuno?token=${BANXICO_TOKEN}`;
-    const response = await axios.get(url);
-    const resultados = parsearSeries(response.data.bmx.series).map(s => ({
-      id: s.id,
-      titulo: s.titulo,
-      fecha: s.datos[0]?.fecha ?? 'N/A',
-      valor: s.datos[0]?.valor ?? 0
-    }));
+    const peticiones = SERIES.map(id =>
+      axios.get(`${BASE_URL}/${id}/datos/oportuno?token=${BANXICO_TOKEN}`)
+    );
+    const respuestas = await Promise.all(peticiones);
+
+    const resultados = respuestas.map(r => {
+      const s = parsearSerie(r.data.bmx.series[0]);
+      return {
+        id: s.id,
+        titulo: s.titulo,
+        fecha: s.datos[0]?.fecha ?? 'N/A',
+        valor: s.datos[0]?.valor ?? 0
+      };
+    });
+
     res.json({ success: true, data: resultados });
   } catch (error) {
-    console.error('Error Banxico /actual:', error.message);
+    console.error('Error Banxico /actual:', error.response?.data || error.message);
     res.status(500).json({ success: false, error: 'Error al consultar Banxico' });
   }
 });
 
 // ─── RUTA 2: Por fecha específica ────────────────────────────────────────────
-// GET /api/tipo-cambio/fecha?fecha=2024-01-15
 app.get('/api/tipo-cambio/fecha', async (req, res) => {
   const { fecha } = req.query;
 
@@ -64,29 +66,30 @@ app.get('/api/tipo-cambio/fecha', async (req, res) => {
     });
   }
 
-  // Banxico espera formato DD/MM/YYYY en la URL
-  const [anio, mes, dia] = fecha.split('-');
-  const fechaBanxico = `${dia}/${mes}/${anio}`;
-
   try {
-    const url = `${BASE_URL}/${SERIES_IDS}/datos/${fechaBanxico}/${fechaBanxico}?token=${BANXICO_TOKEN}`;
-    const response = await axios.get(url);
-    const series = parsearSeries(response.data.bmx.series);
-    const resultados = series.map(s => ({
-      id: s.id,
-      titulo: s.titulo,
-      fecha: s.datos[0]?.fecha ?? fecha,
-      valor: s.datos[0]?.valor ?? null
-    }));
+    const peticiones = SERIES.map(id =>
+      axios.get(`${BASE_URL}/${id}/datos/${fecha}/${fecha}?token=${BANXICO_TOKEN}`)
+    );
+    const respuestas = await Promise.all(peticiones);
+
+    const resultados = respuestas.map(r => {
+      const s = parsearSerie(r.data.bmx.series[0]);
+      return {
+        id: s.id,
+        titulo: s.titulo,
+        fecha: s.datos[0]?.fecha ?? fecha,
+        valor: s.datos[0]?.valor ?? null
+      };
+    });
+
     res.json({ success: true, data: resultados, fechaConsultada: fecha });
   } catch (error) {
-    console.error('Error Banxico /fecha:', error.message);
+    console.error('Error Banxico /fecha:', error.response?.data || error.message);
     res.status(500).json({ success: false, error: 'Error al consultar Banxico' });
   }
 });
 
 // ─── RUTA 3: Rango de fechas ─────────────────────────────────────────────────
-// GET /api/tipo-cambio/rango?inicio=2024-01-01&fin=2024-01-31
 app.get('/api/tipo-cambio/rango', async (req, res) => {
   const { inicio, fin } = req.query;
   const regexFecha = /^\d{4}-\d{2}-\d{2}$/;
@@ -105,19 +108,17 @@ app.get('/api/tipo-cambio/rango', async (req, res) => {
     });
   }
 
-  // Convertir a formato Banxico DD/MM/YYYY
-  const toBanxico = iso => {
-    const [a, m, d] = iso.split('-');
-    return `${d}/${m}/${a}`;
-  };
-
   try {
-    const url = `${BASE_URL}/${SERIES_IDS}/datos/${toBanxico(inicio)}/${toBanxico(fin)}?token=${BANXICO_TOKEN}`;
-    const response = await axios.get(url);
-    const resultados = parsearSeries(response.data.bmx.series);
+    const peticiones = SERIES.map(id =>
+      axios.get(`${BASE_URL}/${id}/datos/${inicio}/${fin}?token=${BANXICO_TOKEN}`)
+    );
+    const respuestas = await Promise.all(peticiones);
+
+    const resultados = respuestas.map(r => parsearSerie(r.data.bmx.series[0]));
+
     res.json({ success: true, data: resultados, rango: { inicio, fin } });
   } catch (error) {
-    console.error('Error Banxico /rango:', error.message);
+    console.error('Error Banxico /rango:', error.response?.data || error.message);
     res.status(500).json({ success: false, error: 'Error al consultar Banxico' });
   }
 });
@@ -135,4 +136,5 @@ app.listen(PORT, () => {
   console.log(`  GET /api/tipo-cambio/fecha?fecha=YYYY-MM-DD`);
   console.log(`  GET /api/tipo-cambio/rango?inicio=YYYY-MM-DD&fin=YYYY-MM-DD`);
 });
+
 
