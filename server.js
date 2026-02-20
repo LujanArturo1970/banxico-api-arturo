@@ -12,7 +12,7 @@ const BASE_URL = 'https://www.banxico.org.mx/SieAPIRest/service/v1/series';
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static('public'));
+app.use(express.static('Public'));
 
 // SERIES: Dólar (SF43718), Euro (SF46410), UDI (SF60653)
 const SERIES_IDS = 'SF43718,SF46410,SF60653';
@@ -124,7 +124,7 @@ app.get('/api/tipo-cambio/rango', async (req, res) => {
 
 // ─── Servir frontend ──────────────────────────────────────────────────────────
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'tablero.html'));
+  res.sendFile(path.join(__dirname, 'Public', 'tablero.html'));
 });
 
 app.listen(PORT, () => {
@@ -135,3 +135,4 @@ app.listen(PORT, () => {
   console.log(`  GET /api/tipo-cambio/fecha?fecha=YYYY-MM-DD`);
   console.log(`  GET /api/tipo-cambio/rango?inicio=YYYY-MM-DD&fin=YYYY-MM-DD`);
 });
+
