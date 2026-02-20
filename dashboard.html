@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard Tipo de Cambio</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body class="bg-gray-100 p-6 transition-all" id="body">
+
+  <!-- Título + Modo oscuro -->
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-3xl font-bold">Dashboard Tipo de Cambio (MXN/USD)</h1>
+
+    <button id="modoBtn" onclick="toggleModo()"
+      class="px-4 py-2 bg-gray-800 text-white rounded shadow hover:bg-black transition">
+      🌙 Modo oscuro
+    </button>
+  </div>
+
+  <!-- Tarjetas principales -->
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+
+    <div class="bg-white p-4 shadow rounded transition hover:shadow-lg">
+      <h2 class="text-gray-500">Tipo de cambio actual</h2>
+      <p id="tc-actual" class="text-2xl font-bold">--</p>
+    </div>
+
+    <div class="bg-white p-4 shadow rounded transition hover:shadow-lg">
+      <h2 class="text-gray-500">Fecha</h2>
+      <p id="tc-fecha" class="text-2xl font-bold">--</p>
+    </div>
+
+    <div class="bg-white p-4 shadow rounded transition hover:shadow-lg">
+      <h2 class="text-gray-500">Registros cargados</h2>
+      <p id="tc-registros" class="text-2xl font-bold">--</p>
+    </div>
+
+    <div class="bg-white p-4 shadow rounded transition hover:shadow-lg">
+      <h2 class="text-gray-500">Tendencia</h2>
+      <p id="tc-tendencia" class="text-2xl font-bold">--</p>
+    </div>
+
+  </div>
+
+  <!-- Estadísticas -->
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+
+    <div class="bg-white p-4 shadow rounded">
