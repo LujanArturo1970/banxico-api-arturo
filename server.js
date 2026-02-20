@@ -1,188 +1,137 @@
-// server.js
+// server.js - CÓDIGO MEJORADO CON CONSULTA POR FECHA
 require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
+const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const BANXICO_TOKEN = process.env.BANXICO_TOKEN;
+const BASE_URL = 'https://www.banxico.org.mx/SieAPIRest/service/v1/series';
 
-// Middleware
 app.use(cors());
 app.use(express.json());
+app.use(express.static('public'));
 
-// URL base de Banxico
-const BANXICO_BASE_URL = 'https://www.banxico.org.mx/SieAPIRest/service/v1';
+// SERIES: Dólar (SF43718), Euro (SF46410), UDI (SF60653)
+const SERIES_IDS = 'SF43718,SF46410,SF60653';
 
-// ============================================
-// ENDPOINT 1: Obtener tipo de cambio actual
-// ============================================
+// Helper para parsear y formatear la respuesta de Banxico
+function parsearSeries(series) {
+  return series.map(serie => {
+    const tieneDatos = serie.datos && serie.datos.length > 0;
+    return {
+      id: serie.idSerie,
+      titulo: serie.titulo,
+      datos: tieneDatos
+        ? serie.datos.map(d => ({
+            fecha: d.fecha,
+            valor: d.dato === 'N/E' ? null : parseFloat(d.dato)
+          }))
+        : []
+    };
+  });
+}
+
+// ─── RUTA 1: Valor más reciente (oportuno) ───────────────────────────────────
 app.get('/api/tipo-cambio/actual', async (req, res) => {
   try {
-    const url = `${BANXICO_BASE_URL}/series/SF43718/datos/oportuno?token=${BANXICO_TOKEN}`;
+    const url = `${BASE_URL}/${SERIES_IDS}/datos/oportuno?token=${BANXICO_TOKEN}`;
     const response = await axios.get(url);
-
-    const serie = response.data.bmx.series[0];
-    const dato = serie.datos[0];
-
-    res.json({
-      success: true,
-      data: {
-        serie: serie.idSerie,
-        titulo: serie.titulo,
-        fecha: dato.fecha,
-        valor: parseFloat(dato.dato),
-        unidad: 'MXN/USD'
-      },
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    console.error('Error:', error.message);
-    res.status(500).json({
-      success: false,
-      error: 'Error al consultar Banxico',
-      message: error.message
-    });
-  }
-});
-
-// ============================================
-// ENDPOINT 2: Obtener histórico por fechas
-// ============================================
-app.get('/api/tipo-cambio/historico', async (req, res) => {
-  try {
-    const { fechaInicio, fechaFin } = req.query;
-
-    if (!fechaInicio || !fechaFin) {
-      return res.status(400).json({
-        success: false,
-        error: 'Se requieren los parámetros fechaInicio y fechaFin',
-        ejemplo: '/api/tipo-cambio/historico?fechaInicio=2024-01-01&fechaFin=2024-12-31'
-      });
-    }
-
-    const url = `${BANXICO_BASE_URL}/series/SF43718/datos/${fechaInicio}/${fechaFin}?token=${BANXICO_TOKEN}`;
-    const response = await axios.get(url);
-
-    const serie = response.data.bmx.series[0];
-    const datos = serie.datos.map(d => ({
-      fecha: d.fecha,
-      valor: parseFloat(d.dato)
+    const resultados = parsearSeries(response.data.bmx.series).map(s => ({
+      id: s.id,
+      titulo: s.titulo,
+      fecha: s.datos[0]?.fecha ?? 'N/A',
+      valor: s.datos[0]?.valor ?? 0
     }));
-
-    res.json({
-      success: true,
-      data: {
-        serie: serie.idSerie,
-        titulo: serie.titulo,
-        fechaInicio,
-        fechaFin,
-        totalRegistros: datos.length,
-        datos: datos
-      },
-      timestamp: new Date().toISOString()
-    });
+    res.json({ success: true, data: resultados });
   } catch (error) {
-    console.error('Error:', error.message);
-    res.status(500).json({
-      success: false,
-      error: 'Error al consultar Banxico',
-      message: error.message
-    });
+    console.error('Error Banxico /actual:', error.message);
+    res.status(500).json({ success: false, error: 'Error al consultar Banxico' });
   }
 });
 
-// ============================================
-// ENDPOINT 3: Obtener tipo de cambio de fecha específica
-// ============================================
-app.get('/api/tipo-cambio/fecha/:fecha', async (req, res) => {
+// ─── RUTA 2: Por fecha específica ────────────────────────────────────────────
+// GET /api/tipo-cambio/fecha?fecha=2024-01-15
+app.get('/api/tipo-cambio/fecha', async (req, res) => {
+  const { fecha } = req.query;
+
+  if (!fecha || !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
+    return res.status(400).json({
+      success: false,
+      error: 'Parámetro "fecha" requerido en formato YYYY-MM-DD'
+    });
+  }
+
+  // Banxico espera formato DD/MM/YYYY en la URL
+  const [anio, mes, dia] = fecha.split('-');
+  const fechaBanxico = `${dia}/${mes}/${anio}`;
+
   try {
-    const { fecha } = req.params;
-    const url = `${BANXICO_BASE_URL}/series/SF43718/datos/${fecha}/${fecha}?token=${BANXICO_TOKEN}`;
+    const url = `${BASE_URL}/${SERIES_IDS}/datos/${fechaBanxico}/${fechaBanxico}?token=${BANXICO_TOKEN}`;
     const response = await axios.get(url);
-
-    const serie = response.data.bmx.series[0];
-
-    if (!serie.datos || serie.datos.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: 'No hay datos para la fecha especificada',
-        fecha: fecha
-      });
-    }
-
-    const dato = serie.datos[0];
-
-    res.json({
-      success: true,
-      data: {
-        fecha: dato.fecha,
-        valor: parseFloat(dato.dato),
-        unidad: 'MXN/USD'
-      },
-      timestamp: new Date().toISOString()
-    });
+    const series = parsearSeries(response.data.bmx.series);
+    const resultados = series.map(s => ({
+      id: s.id,
+      titulo: s.titulo,
+      fecha: s.datos[0]?.fecha ?? fecha,
+      valor: s.datos[0]?.valor ?? null
+    }));
+    res.json({ success: true, data: resultados, fechaConsultada: fecha });
   } catch (error) {
-    console.error('Error:', error.message);
-    res.status(500).json({
-      success: false,
-      error: 'Error al consultar Banxico',
-      message: error.message
-    });
+    console.error('Error Banxico /fecha:', error.message);
+    res.status(500).json({ success: false, error: 'Error al consultar Banxico' });
   }
 });
 
-// ============================================
-// ENDPOINT 4: Health check
-// ============================================
-app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'OK',
-    service: 'Banxico API Proxy',
-    version: '1.0.0',
-    timestamp: new Date().toISOString()
-  });
+// ─── RUTA 3: Rango de fechas ─────────────────────────────────────────────────
+// GET /api/tipo-cambio/rango?inicio=2024-01-01&fin=2024-01-31
+app.get('/api/tipo-cambio/rango', async (req, res) => {
+  const { inicio, fin } = req.query;
+  const regexFecha = /^\d{4}-\d{2}-\d{2}$/;
+
+  if (!inicio || !fin || !regexFecha.test(inicio) || !regexFecha.test(fin)) {
+    return res.status(400).json({
+      success: false,
+      error: 'Parámetros "inicio" y "fin" requeridos en formato YYYY-MM-DD'
+    });
+  }
+
+  if (new Date(inicio) > new Date(fin)) {
+    return res.status(400).json({
+      success: false,
+      error: '"inicio" no puede ser mayor que "fin"'
+    });
+  }
+
+  // Convertir a formato Banxico DD/MM/YYYY
+  const toBanxico = iso => {
+    const [a, m, d] = iso.split('-');
+    return `${d}/${m}/${a}`;
+  };
+
+  try {
+    const url = `${BASE_URL}/${SERIES_IDS}/datos/${toBanxico(inicio)}/${toBanxico(fin)}?token=${BANXICO_TOKEN}`;
+    const response = await axios.get(url);
+    const resultados = parsearSeries(response.data.bmx.series);
+    res.json({ success: true, data: resultados, rango: { inicio, fin } });
+  } catch (error) {
+    console.error('Error Banxico /rango:', error.message);
+    res.status(500).json({ success: false, error: 'Error al consultar Banxico' });
+  }
 });
 
-// ============================================
-// ENDPOINT 5: Documentación
-// ============================================
+// ─── Servir frontend ──────────────────────────────────────────────────────────
 app.get('/', (req, res) => {
-  res.json({
-    servicio: 'API de Tipo de Cambio - Banxico',
-    version: '1.0.0',
-    endpoints: [
-      {
-        metodo: 'GET',
-        ruta: '/api/tipo-cambio/actual',
-        descripcion: 'Obtiene el tipo de cambio más reciente'
-      },
-      {
-        metodo: 'GET',
-        ruta: '/api/tipo-cambio/historico',
-        descripcion: 'Obtiene histórico por rango de fechas',
-        parametros: ['fechaInicio (YYYY-MM-DD)', 'fechaFin (YYYY-MM-DD)']
-      },
-      {
-        metodo: 'GET',
-        ruta: '/api/tipo-cambio/fecha/:fecha',
-        descripcion: 'Obtiene tipo de cambio de una fecha específica',
-        ejemplo: '/api/tipo-cambio/fecha/2024-01-15'
-      },
-      {
-        metodo: 'GET',
-        ruta: '/api/health',
-        descripcion: 'Verifica el estado del servicio'
-      }
-    ],
-    fuente: 'Banco de México (Banxico) - Serie SF43718'
-  });
+  res.sendFile(path.join(__dirname, 'public', 'tablero.html'));
 });
 
-// Iniciar servidor
 app.listen(PORT, () => {
-  console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
-  console.log(`📊 Documentación disponible en http://localhost:${PORT}`);
-  console.log(`✅ Token configurado: ${BANXICO_TOKEN ? 'SÍ' : 'NO'}`);
+  console.log(`🚀 Servidor en http://localhost:${PORT}`);
+  console.log(`✅ Token cargado: ${BANXICO_TOKEN ? 'SÍ' : 'NO'}`);
+  console.log(`\nRutas disponibles:`);
+  console.log(`  GET /api/tipo-cambio/actual`);
+  console.log(`  GET /api/tipo-cambio/fecha?fecha=YYYY-MM-DD`);
+  console.log(`  GET /api/tipo-cambio/rango?inicio=YYYY-MM-DD&fin=YYYY-MM-DD`);
 });
